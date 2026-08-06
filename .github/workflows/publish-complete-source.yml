@@ -1,0 +1,55 @@
+name: Publish complete source now
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-complete-source
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out bootstrap repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and validate project archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .bootstrap
+          test "$(find .bootstrap -maxdepth 1 -name 'project.xz.b64.part*' | wc -l)" -eq 16
+          cat .bootstrap/project.xz.b64.part* > /tmp/project.xz.b64
+          base64 --decode /tmp/project.xz.b64 > /tmp/project.tar.xz
+          echo "a7dd03937ed16bb136b4d2927d41ae39e15f065ca477a528d0f70af5ea70124a  /tmp/project.tar.xz" | sha256sum --check --strict
+          mkdir -p /tmp/project
+          tar -xJf /tmp/project.tar.xz -C /tmp/project --strip-components=1
+          test -f /tmp/project/README.md
+          test -f /tmp/project/LICENSE
+          test -f /tmp/project/install.sh
+          test -f /tmp/project/pyproject.toml
+          test -d /tmp/project/src
+          test -d /tmp/project/docs
+          test -d /tmp/project/.github
+
+      - name: Publish complete project tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/project/. .
+          git config user.name "Seeam Rahman"
+          git config user.email "seeam.labs@proton.me"
+          git add -A
+          git commit -m "Publish complete uConsole Ultimate Control Center source"
+          git push origin HEAD:main
