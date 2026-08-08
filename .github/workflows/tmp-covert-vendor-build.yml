@@ -1,0 +1,57 @@
+name: Temporary Covert Vendor Builder
+
+on:
+  pull_request:
+    branches:
+      - tmp/covert-vendor-base-20260808
+
+permissions:
+  contents: read
+
+jobs:
+  build-vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, bcmath, curl, dom, fileinfo, openssl, pdo, pdo_mysql, tokenizer, xml, xmlwriter, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Show versions
+        run: |
+          php -v
+          composer --version
+
+      - name: Resolve and install production dependencies
+        working-directory: .tmp-covert-vendor
+        env:
+          COMPOSER_NO_INTERACTION: '1'
+          COMPOSER_PROCESS_TIMEOUT: '900'
+        run: |
+          composer update --no-dev --prefer-dist --optimize-autoloader --no-progress --no-scripts
+
+      - name: Verify vendor autoload and platform requirements
+        working-directory: .tmp-covert-vendor
+        run: |
+          test -f vendor/autoload.php
+          php -r "require 'vendor/autoload.php'; echo 'vendor autoload OK'.PHP_EOL;"
+          composer check-platform-reqs --no-dev
+          du -sh vendor
+
+      - name: Upload vendor artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: covert-api-vendor-php83
+          path: |
+            .tmp-covert-vendor/vendor
+            .tmp-covert-vendor/composer.lock
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 1
