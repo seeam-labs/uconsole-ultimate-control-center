@@ -1,2 +1,3 @@
 Trigger temporary Covert API vendor build for PHP 8.3.
 Retry with secure compatible dependency ranges.
+Retry with Laravel 11 advisory policy bypass for compatibility.
